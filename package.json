@@ -1,0 +1,30 @@
+{
+  "name": "icompassinvoice",
+  "version": "1.0.0",
+  "description": "Invoice generation web application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZehangBAO/IcompassInovice.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "bugs": {
+    "url": "https://github.com/ZehangBAO/IcompassInovice/issues"
+  },
+  "homepage": "https://github.com/ZehangBAO/IcompassInovice#readme",
+  "dependencies": {
+    "ejs": "^5.0.1",
+    "express": "^5.2.1",
+    "pdfkit": "^0.18.0"
+  }
+}
