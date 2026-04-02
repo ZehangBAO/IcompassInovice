@@ -1,67 +1,76 @@
 # IcompassInvoice
 
-A lightweight invoice generator built with Node.js, Express, EJS, and PDFKit. It renders invoice previews in the browser and exports downloadable PDF invoices without needing Python, Flask, or a DOCX template pipeline.
+A Flask invoice API that downloads a DOCX template, fills it with JSON data, and returns a downloadable `.docx` invoice. This version is designed for custom internal templates and Lark file URLs.
+
+## Project Structure
+
+```txt
+invoice-app/
+├── app.py
+├── requirements.txt
+├── Dockerfile
+├── render.yaml
+└── output/          # created automatically
+```
 
 ## Features
 
-- Invoice form for sender, recipient, dates, tax, discount, and notes
-- Dynamic line items with live total calculation
-- Browser preview in a new tab
-- PDF download generated on the server
-- Multi-currency support: USD, EUR, GBP, CNY, JPY, AUD, CAD
-- Render-ready deployment with Blueprint support
+- Downloads a DOCX template from `template_url`
+- Renders invoice fields with `docxtpl`
+- Returns a download link for the generated file
+- Supports custom template fields such as `senderName`, `senderAddress`, `items`, and more
+- Ready for Render with either `Docker` or `Python 3`
 
-## Tech Stack
+## How Context Works
 
-- Runtime: Node.js
-- Framework: Express 5
-- Templates: EJS
-- PDF generation: PDFKit
+Every JSON field except `template_url` is passed into the DOCX template context.
 
-## Local Development
+That means these all work directly in your template:
 
-### Prerequisites
-
-- Node.js 18 or newer
-
-### Install
-
-```bash
-npm install
+```json
+{
+  "invoice_no": "INV-001",
+  "customer_name": "Acme Pte Ltd",
+  "senderName": "My Company",
+  "senderAddress": "123 Main St",
+  "senderEmail": "me@example.com",
+  "senderPhone": "+1 555 111 2222",
+  "notes": "Thank you",
+  "template_url": "https://example.com/template.docx"
+}
 ```
 
-### Run
+## Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Basic status page |
+| GET | `/health` | Health check for Render |
+| POST | `/generate-invoice` | Download template, render DOCX, return download URL |
+| GET | `/download/<invoice_no>` | Download the generated DOCX |
+
+## Local Run
 
 ```bash
-npm start
-```
-
-Then open [http://localhost:3000](http://localhost:3000).
-
-### Test
-
-```bash
-npm test
+pip install -r requirements.txt
+gunicorn app:app
 ```
 
 ## Deploy To Render
 
-This repository is already set up for Render as a Node web service.
+### Option 1: Docker
 
-### Option 1: Use `render.yaml`
+- Language: `Docker`
+- Branch: `main`
+- Root Directory: leave blank
 
-1. Push this repo to GitHub.
-2. In Render, choose `New +` -> `Blueprint`.
-3. Select the repository.
-4. Render will read `render.yaml` and create the service automatically.
+Render will use the included `Dockerfile`.
 
-### Option 2: Manual Web Service Setup
+### Option 2: Python 3
 
-- Environment: `Node`
-- Build Command: `npm install`
-- Start Command: `npm start`
-
-Render will inject `PORT` automatically, and `server.js` already listens on `process.env.PORT || 3000`.
+- Language: `Python 3`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app`
 
 ### Health Check
 
@@ -71,37 +80,58 @@ Use:
 /health
 ```
 
-Expected response:
+## Lark Automation JSON
 
 ```json
 {
-  "status": "ok",
-  "service": "IcompassInvoice",
-  "timestamp": "2026-04-02T00:00:00.000Z"
+  "invoice_no": "{{invoice_no}}",
+  "customer_name": "{{customer_name}}",
+  "date": "{{date}}",
+  "amount": "{{amount}}",
+  "notes": "{{notes}}",
+  "template_url": "{{template[0].url}}"
 }
 ```
 
-## Project Structure
+If your internal template uses more fields, just add them to the JSON. Example:
 
-```txt
-IcompassInvoice/
-├── public/
-│   ├── css/styles.css
-│   └── js/main.js
-├── views/
-│   ├── index.ejs
-│   └── invoice.ejs
-├── render.yaml
-├── server.js
-├── test.js
-└── package.json
+```json
+{
+  "invoice_no": "{{invoice_no}}",
+  "senderName": "{{sender_name}}",
+  "senderAddress": "{{sender_address}}",
+  "senderEmail": "{{sender_email}}",
+  "senderPhone": "{{sender_phone}}",
+  "template_url": "{{template[0].url}}"
+}
 ```
 
-## Routes
+## Example Word Template
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Invoice creation form |
-| GET | `/health` | Render health check |
-| POST | `/preview` | Render invoice preview HTML |
-| POST | `/pdf` | Download invoice as PDF |
+```txt
+INVOICE
+
+Invoice No: {{ invoice_no }}
+Customer: {{ customer_name }}
+Date: {{ date }}
+
+Amount: SGD {{ amount }}
+
+Notes:
+{{ notes }}
+
+Thank you for your business.
+```
+
+You can also use custom placeholders like:
+
+```txt
+From: {{ senderName }}
+Address: {{ senderAddress }}
+Email: {{ senderEmail }}
+Phone: {{ senderPhone }}
+```
+
+## Important Note
+
+Generated files are stored in the service container's local filesystem. On Render this is not permanent storage, so generated invoices can disappear after redeploys or restarts.

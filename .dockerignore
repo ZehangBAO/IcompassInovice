@@ -1,6 +1,6 @@
-node_modules/
+.git
+.gitignore
 __pycache__/
+*.pyc
 .venv/
-.env
-*.pdf
 output/

@@ -1,10 +1,5 @@
 services:
   - type: web
     name: icompassinvoice
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
+    env: docker
     healthCheckPath: /health
-    envVars:
-      - key: NODE_VERSION
-        value: 20
