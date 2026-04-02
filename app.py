@@ -9,7 +9,9 @@ from flask import Flask, jsonify, request, send_file
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
+TEMPLATES_DIR = BASE_DIR / "templates"
 OUTPUT_DIR.mkdir(exist_ok=True)
+TEMPLATES_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
 
@@ -20,12 +22,12 @@ def sanitize_invoice_no(value: str) -> str:
 
 
 def build_context(payload: dict, invoice_no: str) -> dict:
-    # Pass through all incoming fields except the template URL so custom
+    # Pass through incoming fields except template selectors so custom
     # templates can use senderName, items, or any other keys directly.
     context = {
         key: value
         for key, value in payload.items()
-        if key != "template_url" and value is not None
+        if key not in {"template_name", "template_url"} and value is not None
     }
     context.setdefault("invoice_no", invoice_no)
     return context
@@ -40,6 +42,21 @@ def download_template(template_url: str, invoice_no: str) -> Path:
     return template_path
 
 
+def resolve_template(data: dict, invoice_no: str) -> tuple[Path, bool]:
+    template_url = data.get("template_url")
+    if template_url:
+        return download_template(template_url, invoice_no), True
+
+    template_name = str(data.get("template_name") or "finance_invoice.docx").strip()
+    safe_template_name = Path(template_name).name
+    template_path = TEMPLATES_DIR / safe_template_name
+
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template not found: {safe_template_name}")
+
+    return template_path, False
+
+
 @app.route("/")
 def home():
     return "Invoice API running"
@@ -50,21 +67,23 @@ def health():
     return jsonify({"status": "ok"})
 
 
+@app.route("/templates")
+def list_templates():
+    templates = sorted(path.name for path in TEMPLATES_DIR.glob("*.docx"))
+    return jsonify({"templates": templates})
+
+
 @app.route("/generate-invoice", methods=["POST"])
 def generate_invoice():
     template_path = None
+    cleanup_template = False
 
     try:
         data = request.get_json(silent=True) or {}
 
         invoice_no = str(data.get("invoice_no") or "INV-000")
         safe_invoice_no = sanitize_invoice_no(invoice_no)
-        template_url = data.get("template_url")
-
-        if not template_url:
-            return jsonify({"error": "No template_url provided"}), 400
-
-        template_path = download_template(template_url, safe_invoice_no)
+        template_path, cleanup_template = resolve_template(data, safe_invoice_no)
 
         doc = DocxTemplate(str(template_path))
         context = build_context(data, invoice_no)
@@ -80,16 +99,19 @@ def generate_invoice():
             {
                 "success": True,
                 "invoice_no": invoice_no,
+                "template_name": data.get("template_name") or template_path.name,
                 "download_url": download_url,
             }
         )
 
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 400
     except requests.RequestException as exc:
         return jsonify({"error": f"Failed to download template: {exc}"}), 400
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     finally:
-        if template_path and template_path.exists():
+        if cleanup_template and template_path and template_path.exists():
             template_path.unlink(missing_ok=True)
 
 

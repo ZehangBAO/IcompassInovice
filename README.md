@@ -10,12 +10,16 @@ invoice-app/
 ├── requirements.txt
 ├── Dockerfile
 ├── render.yaml
+├── templates/
+│   ├── finance_invoice.docx
+│   └── simple_invoice.docx
 └── output/          # created automatically
 ```
 
 ## Features
 
-- Downloads a DOCX template from `template_url`
+- Uses built-in DOCX templates by `template_name`
+- Still supports `template_url` when you want a remote template
 - Renders invoice fields with `docxtpl`
 - Returns a download link for the generated file
 - Supports custom template fields such as `senderName`, `senderAddress`, `items`, and more
@@ -23,7 +27,7 @@ invoice-app/
 
 ## How Context Works
 
-Every JSON field except `template_url` is passed into the DOCX template context.
+Every JSON field except `template_name` and `template_url` is passed into the DOCX template context.
 
 That means these all work directly in your template:
 
@@ -36,7 +40,7 @@ That means these all work directly in your template:
   "senderEmail": "me@example.com",
   "senderPhone": "+1 555 111 2222",
   "notes": "Thank you",
-  "template_url": "https://example.com/template.docx"
+  "template_name": "finance_invoice.docx"
 }
 ```
 
@@ -46,7 +50,8 @@ That means these all work directly in your template:
 |--------|------|-------------|
 | GET | `/` | Basic status page |
 | GET | `/health` | Health check for Render |
-| POST | `/generate-invoice` | Download template, render DOCX, return download URL |
+| GET | `/templates` | List built-in template names |
+| POST | `/generate-invoice` | Use built-in or remote template, render DOCX, return download URL |
 | GET | `/download/<invoice_no>` | Download the generated DOCX |
 
 ## Local Run
@@ -82,6 +87,8 @@ Use:
 
 ## Lark Automation JSON
 
+Recommended if you use built-in templates:
+
 ```json
 {
   "invoice_no": "{{invoice_no}}",
@@ -89,7 +96,7 @@ Use:
   "date": "{{date}}",
   "amount": "{{amount}}",
   "notes": "{{notes}}",
-  "template_url": "{{template[0].url}}"
+  "template_name": "{{template_name}}"
 }
 ```
 
@@ -98,10 +105,24 @@ If your internal template uses more fields, just add them to the JSON. Example:
 ```json
 {
   "invoice_no": "{{invoice_no}}",
+  "customer_name": "{{customer_name}}",
+  "date": "{{date}}",
+  "amount": "{{amount}}",
+  "notes": "{{notes}}",
   "senderName": "{{sender_name}}",
   "senderAddress": "{{sender_address}}",
   "senderEmail": "{{sender_email}}",
   "senderPhone": "{{sender_phone}}",
+  "template_name": "{{template_name}}"
+}
+```
+
+If you still want to use a file uploaded from Lark instead of the built-in templates, you can send `template_url` instead:
+
+```json
+{
+  "invoice_no": "{{invoice_no}}",
+  "customer_name": "{{customer_name}}",
   "template_url": "{{template[0].url}}"
 }
 ```
@@ -131,6 +152,18 @@ Address: {{ senderAddress }}
 Email: {{ senderEmail }}
 Phone: {{ senderPhone }}
 ```
+
+## Built-In Templates
+
+This repo now includes:
+
+- `finance_invoice.docx`
+- `simple_invoice.docx`
+
+In Lark, create a single-select field named `template_name` with values:
+
+- `finance_invoice.docx`
+- `simple_invoice.docx`
 
 ## Important Note
 
